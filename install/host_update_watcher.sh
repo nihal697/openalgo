@@ -31,6 +31,12 @@ if ! have_flag; then
 fi
 
 FLAG_JSON="$(read_flag)"
+# A partially written flag is possible for a split second; re-read once before
+# declaring the request malformed.
+if ! printf '%s' "$FLAG_JSON" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if isinstance(d.get("force"), bool) else 1)' 2>/dev/null; then
+  sleep 1
+  FLAG_JSON="$(read_flag)"
+fi
 log "Update requested: $FLAG_JSON"
 
 # Validate the request before acting on it — any existing file used to pass.
@@ -60,7 +66,12 @@ START="$(date -u '+%FT%TZ')"
 write_result "{\"state\": \"running\", \"started_at\": \"$START\", \"summary\": \"git pull + compose build + up -d in progress\"}"
 clear_flag
 
-cd "$APP"
+# A failed cd must not leave state=running forever, blocking future updates.
+if ! cd "$APP"; then
+  log "cannot cd to $APP"
+  write_result "{\"state\": \"error\", \"started_at\": \"$START\", \"finished_at\": \"$(date -u '+%FT%TZ')\", \"summary\": \"watcher cannot cd to $APP\"}"
+  exit 1
+fi
 
 # Host is authoritative for branch (container has no git; flag only hints).
 BRANCH="$(git branch --show-current 2>/dev/null || echo main)"

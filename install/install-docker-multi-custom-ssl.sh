@@ -1505,6 +1505,11 @@ EOF
     log "Starting Container for $DOMAIN..." "$BLUE"
     log "Building Docker image (includes automated frontend build, may take 2-5 minutes)..." "$YELLOW"
     cd "$INSTANCE_DIR"
+    # Bake real version stamps into the image — without them /system-update
+    # would report "unknown" until the first web-triggered rebuild.
+    export GIT_SHA="$(git -C "$INSTANCE_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+    export GIT_BRANCH="$(git -C "$INSTANCE_DIR" branch --show-current 2>/dev/null || echo main)"
+    export GIT_REMOTE="$(git -C "$INSTANCE_DIR" remote get-url origin 2>/dev/null || echo unknown)"
     # Never start a container from a stale image. A failed build leaves the
     # PREVIOUS image still tagged, so an unconditional `docker compose up -d`
     # restarts the old code and every later message -- including

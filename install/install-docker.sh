@@ -869,7 +869,13 @@ check_status "Nginx reload failed"
 # Build and start Docker container
 log "\n=== Building Docker Image ===" "$BLUE"
 log "Includes automated frontend build. This may take 2-5 minutes depending on your server..." "$YELLOW"
-sudo docker compose build
+# Bake real version stamps into the image — without them /system-update would
+# report "unknown" until the first web-triggered rebuild. Passed through sudo
+# explicitly because sudo's env_reset would drop them otherwise.
+export GIT_SHA="$(git -C "$INSTALL_PATH" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+export GIT_BRANCH="$(git -C "$INSTALL_PATH" branch --show-current 2>/dev/null || echo main)"
+export GIT_REMOTE="$(git -C "$INSTALL_PATH" remote get-url origin 2>/dev/null || echo unknown)"
+sudo env GIT_SHA="$GIT_SHA" GIT_BRANCH="$GIT_BRANCH" GIT_REMOTE="$GIT_REMOTE" docker compose build
 check_status "Docker build failed"
 
 log "\n=== Starting Docker Container ===" "$BLUE"
